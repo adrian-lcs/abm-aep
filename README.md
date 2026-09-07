@@ -3,7 +3,8 @@ Provisional title: Evaluating Agentic Audio Perception via Paired Comparison Dis
 Type:
   - project
   - plan
-Status: work in progress (WIP)
+Status:
+  - work in progress (WIP)
 Tags:
   - python
   - economics/discrete-choice
