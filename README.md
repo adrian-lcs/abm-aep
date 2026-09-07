@@ -202,5 +202,3 @@ response_schema = {
 | **Deterministic-output "reliability" confusion**       | Self-consistency (order-swap, temp=0, primary) kept explicitly separate from stochastic reliability (resampling, temp>0, optional secondary arm).                                     |
 
 ---
-> [!tip]
-> If results show coherent perceptual scaling, review submission suitability.
