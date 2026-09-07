@@ -201,4 +201,4 @@ response_schema = {
 
 ---
 > [!tip]
-> If results show coherent perceptual scaling, review suitability for **ICASSP** or **ISMIR** (audio ML venues) or behavioural/experimental economics journals (JEBO, *Experimental Economics*) submission. Entirely frame-dependant; novelty introduced by applying classical psychophysical paired-comparison methods (2AFC / Bradley-Terry) to LLM evaluation/ABMs rather than human subjects.
+> If results show coherent perceptual scaling, review submission suitability.
