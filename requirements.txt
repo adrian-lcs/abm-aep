@@ -1,0 +1,24 @@
+﻿# Signal processing
+pyloudnorm
+soundfile
+ffmpeg-python
+librosa
+
+# Data & stats
+pandas
+numpy
+statsmodels
+pymc
+wildboottest
+pingouin
+
+# LLM interface
+openai
+litellm
+
+# Visualization
+matplotlib
+seaborn
+
+# Dev / testing
+pytest
