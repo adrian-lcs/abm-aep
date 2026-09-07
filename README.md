@@ -13,7 +13,7 @@ Tags:
   - audio-engineering
 ---
 > [!NOTE]
-> The objective of this project is to evaluate whether multimodal AI models exhibit monotonic, coherent perceptual representations of audio degradation when subjected to lossy compression formats. By leveraging EBU R128 loudness normalization and a [Bradley-Terry model](link-to-page.md) estimated via Maximum Likelihood (with a Bayesian fallback for small samples or separation), this framework converts binary forced-choice decisions into a latent continuous quality scale ($\beta$), explicitly controlling for presentation-order effects.
+> The objective of this project is to evaluate whether multimodal AI models exhibit monotonic, coherent perceptual representations of audio degradation when subjected to lossy compression formats. By leveraging EBU R128 loudness normalisation and a [Bradley-Terry model](link-to-page.md) estimated via Maximum Likelihood (with a Bayesian fallback for small samples or separation), this framework converts binary forced-choice decisions into a latent continuous quality scale ($\beta$), explicitly controlling for presentation-order effects.
 
 ---
 ## 1. Research Hypotheses (Measurable)
@@ -28,9 +28,9 @@ Thresholds above should be finalised from the Phase 0 pilot/power simulation, no
 ## 2. Data & Audio Processing Pipeline
 ```mermaid
 graph LR
-    subgraph S1["1. Input & Normalization"]
+    subgraph S1["1. Input & Normalisation"]
         A["Uncompressed WAV<br/>(15-20s Excerpt)"]
-        B["EBU R128 Normalization<br/>(-14 LUFS, -1.0 dBTP)"]
+        B["EBU R128 Normalisation<br/>(-14 LUFS, -1.0 dBTP)"]
         A --> B
     end
 
@@ -70,15 +70,15 @@ graph LR
 > On signal pre-processing parameters, take into account
 > - **Loudness Target**: Integrated $-14\text{ LUFS}$ via `pyloudnorm`; cross-check with `ffmpeg`'s `loudnorm` filter.
 > - **True-Peak Ceiling**: $-1.0\text{ dBTP}$.
-> - **Clip Length**: 15-20 seconds -- long enough for transient/temporal artifacts to emerge, short enough to manage API cost.
-> - **Vorbis note**: Vorbis is quality-targeted (VBR), not fixed-bitrate. Encode via `-q:a`, then measure and report the *resulting* average bitrate with `ffprobe` rather than treating "~96k-128k" as a literal encoder parameter.
+> - **Clip Length**: 15-20 seconds
+> - **Vorbis note**: Vorbis is quality-targeted (VBR), requiring encoding via `-q:a`, then measure and report the *resulting* average bitrate with `ffprobe` rather than treating "~96k-128k" as an encoder parameter per se.
 
 ---
 ## 3. Discrete Choice Econometric Framework
 
 ### 3.1 Core Specification (Bradley-Terry with Order Effects)
 
-The Bradley-Terry model is the two-alternative special case of a conditional logit / random-utility model, which is what licenses fitting it via standard logistic regression machinery. The probability the agent prefers format $i$ over format $j$ on a given trial:
+The Bradley-Terry model is the two-alternative special case of a conditional logit / random-utility model, which is what licenses fitting it via standard logistic regression machinery. The probability the agent prefers format $i$ over format $j$ on a given trial is given by:
 
 $$P(i \succ j) = \frac{1}{1 + e^{-(\beta_i - \beta_j + \delta \cdot o_{ij})}}$$
 
@@ -89,21 +89,21 @@ Where:
 
 This is algebraically equivalent to the symmetric-split form $P(i \succ j) = \dfrac{e^{\beta_i + \frac{1}{2}\delta o_{ij}}}{e^{\beta_i + \frac{1}{2}\delta o_{ij}} + e^{\beta_j - \frac{1}{2}\delta o_{ij}}}$ -- the two forms give identical win/loss probabilities, but the split form is the one that extends cleanly to the tie model in §3.2, so both are stated here for consistency between sections.
 
-**Estimation**: Because $\beta_i$ only enters as a *difference* ($\beta_i - \beta_j$), the design matrix must encode each trial as (dummy columns for $i$'s format) minus (dummy columns for $j$'s format), with WAV's column omitted as reference, plus the $o_{ij}$ column. This differenced matrix is fit via `statsmodels.discrete.discrete_model.Logit` (or `statsmodels.discrete.conditional_models.ConditionalLogit` if stratifying by clip -- see Phase 3).
+**Estimation**: Because $\beta_i$ only enters as a difference ($\beta_i - \beta_j$), the design matrix must encode each trial as (dummy columns for $i$'s format) minus (dummy columns for $j$'s format), with WAV columns omitted as reference, plus the $o_{ij}$ column. This differenced matrix is fit via `statsmodels.discrete.discrete_model.Logit` or `statsmodels.discrete.conditional_models.ConditionalLogit` if stratifying by clip -- see P.3).
 
-**Standard errors**: default to `cov_type='cluster'` with `cov_kwds={'groups': clip_id}`, since multiple comparisons share the same underlying clip. However, with only 20 clips (clusters), this sits near or below the G~30-50 range where cluster-robust SE asymptotics are typically considered reliable -- the exact threshold is debated in the literature, but 20 is low enough to be cautious. As a robustness check, re-estimate inference via **wild cluster bootstrap** (Cameron, Gelbach & Miller 2008), clustering on `clip_id`. `statsmodels` doesn't implement CGM wild bootstrap natively -- use the `wildboottest` package, or a hand-rolled bootstrap-t loop, rather than assuming a `cov_type` flag covers this. Treat this as a check on the cluster-robust SEs, not a replacement for the `ConditionalLogit` clip-stratified fit in Phase 3, which addresses clip heterogeneity in the point estimates rather than the inference.
+**Standard errors**: default to `cov_type='cluster'` with `cov_kwds={'groups': clip_id}`, since multiple comparisons share the same underlying clip. Given only 20 clips (clusters), this sits near or below the G~30-50 range where cluster-robust SE asymptotics are typically considered reliable. The exact threshold is debated in the literature, making 20 a conservative estimate. As a robustness check, re-estimate inference via **wild cluster bootstrap** (*Cameron, Gelbach & Miller*, 2008), clustering on `clip_id`. `statsmodels` does not natively implement CGM wild bootstrap, forcing usage of the `wildboottest` package, or a hand-rolled bootstrap-t loop, rather than assuming `cov_type` flag coverage. Treat as a check on the cluster-robust SEs, not a replacement for the `ConditionalLogit` clip-stratified fit in P.3, which addresses clip heterogeneity in the point estimates rather than the inference.
 
 ### 3.2 Handling Ties and Indifference
 
-Agents may respond "equivalent" or with low confidence. Use the **Davidson (1970)** extension of Bradley-Terry, with the order term carried through into the item-strength exponentials (not dropped, as in an earlier draft of this document) so that order bias is controlled consistently whether the agent expresses a preference or calls a tie:
+Agents may respond "equivalently" or with low confidence. Use the ***Davidson (1970)*** extension of Bradley-Terry, with the order term carried through into the item-strength exponentials, so that order bias is controlled consistently whether the agent expresses a preference or calls a tie:
 
 $$P(i \succ j) = \frac{e^{\beta_i + \frac{1}{2}\delta o_{ij}}}{e^{\beta_i + \frac{1}{2}\delta o_{ij}} + e^{\beta_j - \frac{1}{2}\delta o_{ij}} + \nu\sqrt{e^{\beta_i + \beta_j}}}, \qquad P(\text{tie}) = \frac{\nu\sqrt{e^{\beta_i + \beta_j}}}{e^{\beta_i + \frac{1}{2}\delta o_{ij}} + e^{\beta_j - \frac{1}{2}\delta o_{ij}} + \nu\sqrt{e^{\beta_i + \beta_j}}}$$
 
-Note the $\nu\sqrt{e^{\beta_i+\beta_j}}$ term is itself order-invariant (the $\pm\frac12\delta o_{ij}$ terms cancel in the sum $\beta_i+\beta_j$), so only the win/loss terms need the order adjustment -- the tie probability doesn't depend on presentation order, which is the intuitively correct behavior.
+Note the $\nu\sqrt{e^{\beta_i+\beta_j}}$ term is itself order-invariant (the $\pm\frac12\delta o_{ij}$ terms cancel in the sum $\beta_i+\beta_j$), so only the win/loss terms need the order adjustment -- the tie probability doesn't depend on presentation order, which is the intuitively correct behaviour.
 
-$\nu \geq 0$ is estimated jointly with $\{\beta_i\}$ and $\delta$ via maximum likelihood; $\nu \to 0$ recovers standard BT. If too few ties occur for stable estimation of $\nu$, fall back to coding ties as 0.5-wins-each (an approximation, not the preferred solution).
+$\nu \geq 0$ is estimated jointly with $\{\beta_i\}$ and $\delta$ via MLE; $\nu \to 0$ recovers standard BT. If too few ties occur for stable estimation of $\nu$, fall back to coding ties as 0.5-wins-each (an approximation, not the preferred solution).
 
-The `confidence` field collected in the JSON output can be used here -- e.g. as an inverse-variance case weight in the likelihood, or to set a data-driven confidence threshold below which a "win" is recoded as a tie for robustness checks. If it ends up unused, drop it from the schema rather than let it sit uninterpreted.
+The `confidence` field collected in the JSON output can be used here -- i.e., as an inverse-variance case weight in the likelihood, or to set a data-driven confidence threshold below which a "win" is recoded as a tie for robustness checks. Consider drop from the schema if this ends up unused
 
 ### 3.3 Separation & Identification Diagnostics
 
@@ -111,7 +111,7 @@ Before interpreting any coefficients, check:
 1. **Complete/quasi-complete separation**: any format that wins 100% (or loses 100%) of its comparisons pushes its MLE estimate toward $\pm\infty$. Detect via `statsmodels`' separation warnings.
 2. **Connectivity**: the comparison graph (formats as nodes, observed comparisons as edges) must be fully connected for all $\beta_i$ to be jointly identified -- independent of sample size. The hub-and-spoke design in §2 guarantees this by construction, but verify it wasn't broken by dropped/failed trials before fitting.
 
-**If separation occurs**: prefer a fully Bayesian fit (`pymc`, weakly informative `Normal(0, 2)` priors on $\beta$) or genuine Firth bias-reduction via the `firthlogit` package (Firth's method is a specific Jeffreys-prior penalized likelihood, not the same as generic L1/L2 shrinkage via `fit_regularized` -- don't conflate the two).
+**If separation occurs**, prefer a Bayesian fit (`pymc`, weakly informative `Normal(0, 2)` priors on $\beta$) or genuine Firth's method bias-reduction via the `firthlogit` package. Recall that Firth's method is a specific Jeffreys-prior penalised likelihood, not generic L1/L2 shrinkage via `fit_regularized`.
 
 ---
 ## 4. Execution Roadmap
@@ -120,7 +120,7 @@ Before interpreting any coefficients, check:
     - [ ] Simulate Bradley-Terry data under assumed effect sizes to confirm the §2 design (20 clips, hub+adjacent+symmetric cross-codec pairing) gives >=80% power for the $H_1$ thresholds.
     - [ ] Run a pilot on 2 clips through the full pipeline (normalization -> encoding -> pairing -> structured-audio agent call -> parsing) to validate the harness end-to-end before scaling up.
 - [ ] **Phase 1: Environment & Signal Prep**
-    - [ ] Initialize environment: `pyloudnorm`, `soundfile`, `ffmpeg-python`, `pandas`, `statsmodels`, `pingouin`, `wildboottest`.
+    - [ ] Initialise environment: `pyloudnorm`, `soundfile`, `ffmpeg-python`, `pandas`, `statsmodels`, `pingouin`, `wildboottest`.
     - [ ] Curate 20 WAV excerpts spanning transient-heavy (castanets), sustained-tone (harpsichord), speech, full-mix pop, and orchestral material.
     - [ ] Batch process: normalize -> encode all 10 formats -> verify actual bitrates with `ffprobe` (especially for Vorbis).
 - [ ] **Phase 2: Agent Harness & Data Collection**
@@ -142,7 +142,7 @@ messages = [
     ]}
 ]
 ```
-- [ ] **Prompt/output schema**: enforced via the API's structured-output/JSON-schema mode, not free-text parsing.
+- [ ] **Prompt/output schema**: enforced via the API's structured-output/JSON-schema mode, not free-text parsing. Token-brief examples below:
 
 ```python
 system = (
@@ -169,9 +169,9 @@ response_schema = {
     - [ ] Test $H_1$ via one-sided tests against the non-zero thresholds; test $H_2$ via the TOST-style equivalence check; test $H_3$ at both the 96k and 128k tiers now that both are in the design.
     - [ ] Compute order-swap self-consistency metrics: preference-reversal rate, and transitivity-violation rate across comparison triads.
     - [ ] If a stability check across estimation subsets is wanted, frame it as a **subset-stability / transitivity diagnostic** (re-fit on data subsets, check $\beta_i - \beta_j$ stability) -- not a classical Hausman IIA test, which assumes >=3 simultaneously available alternatives per choice occasion and doesn't map cleanly onto a purely pairwise design.
-- [ ] **Phase 4: Validation & Visualization**
+- [ ] **Phase 4: Validation & Visualisation**
     - [ ] Plot $\beta$ estimates with 95% CIs (caterpillar plot); flag overlapping CIs between adjacent bitrates.
-    - [ ] If monotonicity fails: extract [[Mel-Spectrogram]] via `librosa` for the anomalous pairs and inspect for spectral rolloff or pre-echo.
+    - [ ] If monotonicity fails: extract [[Mel-Spectrogram]] via `librosa` for the anomalous pairs and inspect for spectral roll-off or pre-echo.
     - [ ] Likelihood-ratio test comparing the model with vs. without the order effect $\delta$.
 
 ---
@@ -179,12 +179,12 @@ response_schema = {
 
 | Category | Tool / Library | Notes |
 | :--- | :--- | :--- |
-| Audio Normalization | `pyloudnorm`, `soundfile` | Cross-check integrated loudness against `ffmpeg`'s `loudnorm` filter. |
+| Audio Normalisation | `pyloudnorm`, `soundfile` | Cross-check integrated loudness against `ffmpeg`'s `loudnorm` filter. |
 | Encoding Engine | `ffmpeg-python` | CBR (`-b:a`) for MP3/AAC/Opus; `-q:a` for Vorbis with measured resulting bitrate via `ffprobe`. |
 | LLM Interface | `openai` SDK for OpenAI audio-capable models; `litellm` if cross-provider comparison (e.g. Gemini) is in scope. | Structured multimodal content parts for audio input (not inline base64 text); JSON-schema structured-output mode for the response. |
 | Econometric Fitting | `statsmodels` (`Logit` for pooled model, `ConditionalLogit` for clip-stratified robustness); `pymc` if Bayesian fallback needed for separation; `wildboottest` for small-cluster inference. | Differenced design matrix per §3.1; `cov_type='cluster'` on `clip_id`, cross-checked with wild cluster bootstrap given G=20. |
 | Reliability Metrics | `pingouin` | Order-swap reversal/transitivity rates as primary consistency metric; ICC only if a genuine stochastic-resampling arm (temp > 0) is added. |
-| Visualizations | `matplotlib`, `seaborn` | Caterpillar plots for $\beta$ parameters. |
+| Visualisations | `matplotlib`, `seaborn` | Caterpillar plots for $\beta$ parameters. |
 
 ---
 ## 6. Risk Mitigation & Alternative Specifications
