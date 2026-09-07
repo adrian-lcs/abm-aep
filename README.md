@@ -7,8 +7,10 @@ Status:
   - work in progress (WIP)
 Tags:
   - python
-  - economics/discrete-choice
-  - project/audio-eval
+  - economics
+  - discrete-choice
+  - project
+  - audio-engineering
 ---
 > [!NOTE]
 > The objective of this project is to evaluate whether multimodal AI models exhibit monotonic, coherent perceptual representations of audio degradation when subjected to lossy compression formats. By leveraging EBU R128 loudness normalization and a [Bradley-Terry model](link-to-page.md) estimated via Maximum Likelihood (with a Bayesian fallback for small samples or separation), this framework converts binary forced-choice decisions into a latent continuous quality scale ($\beta$), explicitly controlling for presentation-order effects.
