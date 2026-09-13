@@ -13,10 +13,10 @@ wildboottest
 pingouin
 
 # LLM interface
-openai-compatible
-anthropic/claude-sonnet-5
-meta/llama-3
-deepseek-r1
+openai
+anthropic
+ollama
+deepseek
 
 # Visualization
 matplotlib
